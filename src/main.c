@@ -1,9 +1,17 @@
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sysexits.h>
 
 #include "parser.h"
+#include "compiler.h"
+
+static Expr *allocateExpr() {
+  Expr *expr;
+  assert((expr = (Expr *)malloc(sizeof(Expr))) != NULL);
+  return expr;
+}
 
 static void repl() {
 #define MAX_REPL_LINE 1024
@@ -17,7 +25,7 @@ static void repl() {
       break;
     }
 
-    parse(line);
+    compile(line);
   }
 
 #undef MAX_REPL_LINE
@@ -54,8 +62,8 @@ static char *readFile(const char *path) {
 
 static void runFile(const char *path) {
   char *source = readFile(path);
-
-  parse(source);
+  
+  compile(source);
 
   free(source); 
 }
