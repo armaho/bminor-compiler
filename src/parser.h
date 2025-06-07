@@ -126,7 +126,62 @@ struct _expr {
 #define PTR_AS_IDX(expr) ((expr)->as.idxExpr)
 #define PTR_AS_CALL(expr) ((expr)->as.callExpr)
 
-int parse(Expr *expr, const char* source);
-void freeExpr(Expr *expr);
+typedef enum {
+  STMT_INT_DECLARATION,
+  STMT_ASSIGNMENT,
+} StmtType;
+
+typedef struct {
+  Token ident;
+} IntDeclarationStmt;
+
+typedef struct {
+  Token ident;
+  Expr *expr;
+} AssignmentStmt;
+
+typedef struct {
+  StmtType type;
+  union {
+    IntDeclarationStmt intDeclarationStmt;
+    AssignmentStmt assignmentStmt;
+  } as;
+} Stmt;
+
+typedef struct {
+  int len;
+  int cap;
+  Stmt *stmts;
+} Program;
+
+#define INT_DECLARATION_STMT(identifier) \
+  ((Stmt){ \
+   .type = STMT_INT_DECLARATION, \
+   .as = { \
+     .intDeclarationStmt = { \
+       .ident = (identifier), \
+       }, \
+     }, \
+   })
+
+#define ASSIGNMENT_STMT(identifier, exprPtr) \
+  ((Stmt){ \
+    .type = STMT_ASSIGNMENT, \
+    .as = { \
+      .assignmentStmt = { \
+        .ident = (identifier), \
+        .expr = (exprPtr), \
+      } \
+    } \
+  })
+
+#define AS_INT_DECLARATION(stmt) ((stmt).as.intDeclarationStmt)
+#define AS_ASSIGNMENT(stmt) ((stmt).as.assignmentStmt)
+
+#define PTR_AS_INT_DECLARATION(stmt) ((stmt)->as.intDeclarationStmt)
+#define PTR_AS_ASSIGNMENT(stmt) ((stmt)->as.assignmentStmt)
+
+int initProgram(Program *program);
+int parse(Program *program, const char* source);
 
 #endif

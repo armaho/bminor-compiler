@@ -6,21 +6,34 @@
 #include "common.h"
 #include "disassemble.h"
 
-int compile(const char *source) {
-  Expr *expr = MALLOC_OR_DIE(Expr, 1);
+void compileIntDeclaration(IntDeclarationStmt stmt) {
+  printf("int %.*s; ", stmt.ident.length, stmt.ident.start);
+}
 
-  if (parse(expr, source)) {
+void compileAssignment(AssignmentStmt stmt) {
+  printf("%.*s = ", stmt.ident.length, stmt.ident.start);
+  disassembleExpr(stmt.expr);
+  printf(";");
+}
+
+int compile(const char *source) {
+  Program *program = MALLOC_OR_DIE(Program, 1);
+
+  if (parse(program, source)) {
+    printf("err\n");
     return -1;
   }
 
-#ifdef DEBUG_PRINT_PARSER
- 
-  disassembleExpr(expr);
-  printf("\n");
+  for (int i = 0; i < program->len; i++) {
+    Stmt s = program->stmts[i];
 
-#endif
- 
-  freeExpr(expr);
+    switch (s.type) {
+      case STMT_INT_DECLARATION: compileIntDeclaration(AS_INT_DECLARATION(s)); break;
+      case STMT_ASSIGNMENT: compileAssignment(AS_ASSIGNMENT(s)); break;
+    }
+  }
+
+  printf("\n");
 
   return 0;
 }

@@ -8,6 +8,8 @@
 #include "scanner.h"
 #include "disassemble.h"
 
+#define INIT_PROGRAM_SIZE 8
+
 typedef struct {
   Token current;
   Token previous;
@@ -44,6 +46,7 @@ static int expression(Expr *expr);
 static ParseRule *getRule(TokenType type);
 static int parsePrecedence(Expr *expr, Precedence precedence);
 static void freeInsideExpr(Expr *expr);
+static void freeExpr(Expr *expr);
 
 static void errorAt(Token *token, const char *message) {
   fprintf(stderr, "[line %d] Error", token->line);
@@ -218,8 +221,8 @@ ParseRule rules[] = {
   [TOKEN_AND]            = {NULL,              binaryArithmeticHandler,   PREC_AND},
   [TOKEN_OR]             = {NULL,              binaryArithmeticHandler,   PREC_OR},
   [TOKEN_IDENTIFIER]     = {literalHandler,    NULL,                      PREC_NONE},
-  [TOKEN_STRING_LITERAL] = {NULL,              NULL,                      PREC_NONE},
-  [TOKEN_CHAR_LITERAL]   = {NULL,              NULL,                      PREC_NONE},
+  [TOKEN_STRING_LITERAL] = {literalHandler,    NULL,                      PREC_NONE},
+  [TOKEN_CHAR_LITERAL]   = {literalHandler,    NULL,                      PREC_NONE},
   [TOKEN_NUMBER]         = {literalHandler,    NULL,                      PREC_PRIMARY},
   [TOKEN_ARRAY]          = {NULL,              NULL,                      PREC_NONE},
   [TOKEN_BOOLEAN]        = {NULL,              NULL,                      PREC_NONE},
@@ -260,8 +263,14 @@ static int parsePrecedence(Expr *expr, Precedence precedence) {
     advance();
     InfixParseFn infixRule = getRule(parser.previous.type)->infix;
 
+    if (infixRule == NULL) {
+      error("Invalid infix operator");
+      return -1;
+    }
+
     Expr *newExpr = MALLOC_OR_DIE(Expr, 1);
     *newExpr = *expr;
+
     if (infixRule(expr, newExpr)) return -1;
   }
 
@@ -269,7 +278,16 @@ static int parsePrecedence(Expr *expr, Precedence precedence) {
 }
 
 static int expression(Expr *expr) {
-  return parsePrecedence(expr, PREC_ASSIGNMENT);
+  if (parsePrecedence(expr, PREC_ASSIGNMENT)) return -1;
+
+#ifdef DEBUG_PRINT_PARSER
+ 
+  disassembleExpr(expr);
+  printf("\n");
+
+#endif
+
+  return 0;
 }
 
 static void freeLiteralExpr(LiteralExpr expr) {
@@ -307,24 +325,87 @@ static void freeInsideExpr(Expr *expr) {
   }
 }
 
-int parse(Expr *expr, const char* source) {
-  initScanner(source);
-  
-  advance();
+static void freeExpr(Expr *expr) {
+  freeInsideExpr(expr);
+  free(expr);
+}
 
-  if (expression(expr)) {
-    return -1;
+int initProgram(Program *program) {
+  program->len = 0;
+  program->cap = 8;
+  program->stmts = (Stmt *)MALLOC_OR_DIE(Stmt, INIT_PROGRAM_SIZE);
+
+  return 0;
+}
+
+static int addProgram(Program *program, Stmt s) {
+  if (program->cap == program->len) {
+    int newCap = 2 * program->cap;
+    
+    program->stmts = REALLOC_OR_DIE(Stmt, program->stmts, newCap);
+    program->cap = newCap;
   }
 
-  if (!consume(TOKEN_EOF, "Expected end of expression.")) {
+  program->stmts[program->len++] = s;
+
+  return 0;
+}
+
+static bool consumeSemicolon() {
+  return consume(TOKEN_SEMICOLON, "Expected ';'");
+}
+
+static int addAssignmentStmt(Program *program) {
+  Token ident = parser.previous;
+
+  advance();
+
+  Expr *expr = MALLOC_OR_DIE(Expr, 1);
+  if (expression(expr)) return -1;
+
+  addProgram(program, ASSIGNMENT_STMT(ident, expr));
+
+  return 0;
+}
+
+static int addIntDeclarationStmt(Program *program) {
+  advance();
+
+  if (!consume(TOKEN_IDENTIFIER, "Invalid Identifier")) return -1;
+
+  addProgram(program, INT_DECLARATION_STMT(parser.previous));
+  
+  if (match(TOKEN_EQUAL)) {
+    addAssignmentStmt(program);   
+    consumeSemicolon();
+  } else if (match(TOKEN_SEMICOLON)) {
+    advance();
+  } else {
+    errorAtCurrent("Expected ';'");
     return -1;
   }
 
   return 0;
 }
 
-void freeExpr(Expr *expr) {
-  freeInsideExpr(expr);
-  free(expr);
+static int addStmt(Program *program) {
+  switch (parser.current.type) {
+    case TOKEN_INTEGER: return addIntDeclarationStmt(program);
+    case TOKEN_EOF: advance(); return 0;
+    default: return -1; // unreachable
+  }
 }
+
+int parse(Program *program, const char *source) {
+    initScanner(source);
+    
+    advance();
+
+    while (parser.current.type != TOKEN_EOF) {
+      if (addStmt(program)) return -1;
+    }
+
+    return 0;
+}
+
 
