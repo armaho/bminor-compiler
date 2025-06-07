@@ -16,14 +16,15 @@ typedef struct {
 typedef enum {
   PREC_NONE,
   PREC_ASSIGNMENT,  // =
-  PREC_OR,          // or
-  PREC_AND,         // and
+  PREC_OR,          // ||
+  PREC_AND,         // &&
   PREC_EQUALITY,    // == !=
   PREC_COMPARISON,  // < > <= >=
   PREC_TERM,        // + -
   PREC_FACTOR,      // * / %
   PREC_POWER,       // ^
   PREC_UNARY,       // ! -
+  PREC_INC_DCR,     // -- ++
   PREC_CALL,        // [] ()
   PREC_PRIMARY
 } Precedence;
@@ -42,6 +43,7 @@ Parser parser;
 static int expression(Expr *expr);
 static ParseRule *getRule(TokenType type);
 static int parsePrecedence(Expr *expr, Precedence precedence);
+static void freeInsideExpr(Expr *expr);
 
 static void errorAt(Token *token, const char *message) {
   fprintf(stderr, "[line %d] Error", token->line);
@@ -75,8 +77,6 @@ static void advance() {
 
 #endif
 
-    if (parser.current.type != TOKEN_ERROR) break;
-
     switch (parser.current.type) {
       case TOKEN_ERROR: errorAtCurrent(parser.current.start); break;
       case TOKEN_COMMENT: break;
@@ -95,7 +95,11 @@ static bool consume(TokenType type, const char *message) {
   return false;
 }
 
-static int numberHandler(Expr *expr) {
+static bool match(TokenType type) {
+  return parser.current.type == type;
+}
+
+static int literalHandler(Expr *expr) {
   Token token = parser.previous;
   *expr = LITERAL_EXPR(token);
   return 0;
@@ -125,6 +129,14 @@ static int unaryHandler(Expr *expr) {
   return 0;
 }
 
+static int postfixHandler(Expr *expr, Expr *leftHandExpr) {
+  Token token = parser.previous;
+
+  *expr = UNARY_EXPR(token, leftHandExpr);
+
+  return 0;
+}
+
 static int binaryArithmeticHandler(Expr *expr, Expr *leftHandExpr) {
   Token token = parser.previous;
   ParseRule *rule = getRule(token.type);
@@ -137,57 +149,96 @@ static int binaryArithmeticHandler(Expr *expr, Expr *leftHandExpr) {
   return 0; 
 }
 
+static int idxHandler(Expr *expr, Expr *leftHandExpr) {
+  Expr *idxExpr = MALLOC_OR_DIE(Expr, 1);
+  if (expression(idxExpr)) {
+    return -1;
+  } 
+
+  if (!consume(TOKEN_RIGHT_BRACKET, "Expected ']' at the end of expression.")) {
+    return -1;
+  }
+
+  *expr = IDX_EXPR(leftHandExpr, idxExpr);
+
+  return 0;
+}
+
+static int callHandler(Expr *expr, Expr *leftHandExpr) {
+  Expr *params = MALLOC_OR_DIE(Expr, MAX_FUNC_PARAM);
+  int paramCnt = 0;
+
+  while (!match(TOKEN_EOF) && !match(TOKEN_RIGHT_PAREN) && paramCnt <= MAX_FUNC_PARAM) {
+    if (paramCnt != 0 && !consume(TOKEN_COMMA, "Expected ',' between arguments.")) return -1;
+    
+    if (paramCnt == MAX_FUNC_PARAM) {
+      errorAtCurrent("Too many arguments for call.");
+      return -1;
+    }
+
+    if (expression(params + paramCnt)) return -1;
+
+    paramCnt++;
+  }
+
+  if (!consume(TOKEN_RIGHT_PAREN, "Expected ')' after function call")) return -1;
+
+  *expr = CALL_EXPR(paramCnt, leftHandExpr, params);
+
+  return 0;
+}
+
 ParseRule rules[] = {
-  [TOKEN_LEFT_PAREN]     = {groupingHandler, NULL,                      PREC_NONE},
-  [TOKEN_RIGHT_PAREN]    = {NULL,            NULL,                      PREC_NONE},
-  [TOKEN_LEFT_BRACE]     = {NULL,            NULL,                      PREC_NONE},
-  [TOKEN_RIGHT_BRACE]    = {NULL,            NULL,                      PREC_NONE},
-  [TOKEN_LEFT_BRACKET]   = {NULL,            NULL,                      PREC_NONE},
-  [TOKEN_RIGHT_BRACKET]  = {NULL,            NULL,                      PREC_NONE},
-  [TOKEN_COMMA]          = {NULL,            NULL,                      PREC_NONE},
-  [TOKEN_DOT]            = {NULL,            NULL,                      PREC_NONE},
-  [TOKEN_COLON]          = {NULL,            NULL,                      PREC_NONE},
-  [TOKEN_MINUS]          = {unaryHandler,    binaryArithmeticHandler,   PREC_TERM},
-  [TOKEN_PLUS]           = {NULL,            binaryArithmeticHandler,   PREC_TERM},
-  [TOKEN_SEMICOLON]      = {NULL,            NULL,                      PREC_NONE},
-  [TOKEN_SLASH]          = {NULL,            binaryArithmeticHandler,   PREC_FACTOR},
-  [TOKEN_STAR]           = {NULL,            binaryArithmeticHandler,   PREC_FACTOR},
-  [TOKEN_POW]            = {NULL,            binaryArithmeticHandler,   PREC_POWER},
-  [TOKEN_MOD]            = {NULL,            binaryArithmeticHandler,   PREC_FACTOR},
-  [TOKEN_BANG]           = {NULL,            NULL,                      PREC_NONE},
-  [TOKEN_BANG_EQUAL]     = {NULL,            NULL,                      PREC_NONE},
-  [TOKEN_EQUAL]          = {NULL,            NULL,                      PREC_NONE},
-  [TOKEN_EQUAL_EQUAL]    = {NULL,            NULL,                      PREC_NONE},
-  [TOKEN_GREATER]        = {NULL,            NULL,                      PREC_NONE},
-  [TOKEN_GREATER_EQUAL]  = {NULL,            NULL,                      PREC_NONE},
-  [TOKEN_LESS]           = {NULL,            NULL,                      PREC_NONE},
-  [TOKEN_LESS_EQUAL]     = {NULL,            NULL,                      PREC_NONE},
-  [TOKEN_PLUS_PLUS]      = {NULL,            NULL,                      PREC_NONE},
-  [TOKEN_MINUS_MINUS]    = {NULL,            NULL,                      PREC_NONE},
-  [TOKEN_AND]            = {NULL,            NULL,                      PREC_NONE},
-  [TOKEN_OR]             = {NULL,            NULL,                      PREC_NONE},
-  [TOKEN_IDENTIFIER]     = {NULL,            NULL,                      PREC_NONE},
-  [TOKEN_STRING_LITERAL] = {NULL,            NULL,                      PREC_NONE},
-  [TOKEN_CHAR_LITERAL]   = {NULL,            NULL,                      PREC_NONE},
-  [TOKEN_NUMBER]         = {numberHandler,   NULL,                      PREC_PRIMARY},
-  [TOKEN_ARRAY]          = {NULL,            NULL,                      PREC_NONE},
-  [TOKEN_BOOLEAN]        = {NULL,            NULL,                      PREC_NONE},
-  [TOKEN_CHAR]           = {NULL,            NULL,                      PREC_NONE},
-  [TOKEN_INTEGER]        = {NULL,            NULL,                      PREC_NONE},
-  [TOKEN_STRING]         = {NULL,            NULL,                      PREC_NONE},
-  [TOKEN_VOID]           = {NULL,            NULL,                      PREC_NONE},
-  [TOKEN_IF]             = {NULL,            NULL,                      PREC_NONE},
-  [TOKEN_ELSE]           = {NULL,            NULL,                      PREC_NONE},
-  [TOKEN_WHILE]          = {NULL,            NULL,                      PREC_NONE},
-  [TOKEN_FOR]            = {NULL,            NULL,                      PREC_NONE},
-  [TOKEN_TRUE]           = {NULL,            NULL,                      PREC_NONE},
-  [TOKEN_FALSE]          = {NULL,            NULL,                      PREC_NONE},
-  [TOKEN_FUNCTION]       = {NULL,            NULL,                      PREC_NONE},
-  [TOKEN_RETURN]         = {NULL,            NULL,                      PREC_NONE},
-  [TOKEN_PRINT]          = {NULL,            NULL,                      PREC_NONE},
-  [TOKEN_EOF]            = {NULL,            NULL,                      PREC_NONE},
-  [TOKEN_ERROR]          = {NULL,            NULL,                      PREC_NONE},
-  [TOKEN_COMMENT]        = {NULL,            NULL,                      PREC_NONE},
+  [TOKEN_LEFT_PAREN]     = {groupingHandler,   callHandler,               PREC_CALL},
+  [TOKEN_RIGHT_PAREN]    = {NULL,              NULL,                      PREC_NONE},
+  [TOKEN_LEFT_BRACE]     = {NULL,              NULL,                      PREC_NONE},
+  [TOKEN_RIGHT_BRACE]    = {NULL,              NULL,                      PREC_NONE},
+  [TOKEN_LEFT_BRACKET]   = {NULL,              idxHandler,                PREC_CALL},
+  [TOKEN_RIGHT_BRACKET]  = {NULL,              NULL,                      PREC_NONE},
+  [TOKEN_COMMA]          = {NULL,              NULL,                      PREC_NONE},
+  [TOKEN_DOT]            = {NULL,              NULL,                      PREC_NONE},
+  [TOKEN_COLON]          = {NULL,              NULL,                      PREC_NONE},
+  [TOKEN_MINUS]          = {unaryHandler,      binaryArithmeticHandler,   PREC_TERM},
+  [TOKEN_PLUS]           = {NULL,              binaryArithmeticHandler,   PREC_TERM},
+  [TOKEN_SEMICOLON]      = {NULL,              NULL,                      PREC_NONE},
+  [TOKEN_SLASH]          = {NULL,              binaryArithmeticHandler,   PREC_FACTOR},
+  [TOKEN_STAR]           = {NULL,              binaryArithmeticHandler,   PREC_FACTOR},
+  [TOKEN_POW]            = {NULL,              binaryArithmeticHandler,   PREC_POWER},
+  [TOKEN_MOD]            = {NULL,              binaryArithmeticHandler,   PREC_FACTOR},
+  [TOKEN_BANG]           = {unaryHandler,      NULL,                      PREC_NONE},
+  [TOKEN_BANG_EQUAL]     = {NULL,              binaryArithmeticHandler,   PREC_EQUALITY},
+  [TOKEN_EQUAL]          = {NULL,              binaryArithmeticHandler,   PREC_ASSIGNMENT},
+  [TOKEN_EQUAL_EQUAL]    = {NULL,              binaryArithmeticHandler,   PREC_EQUALITY},
+  [TOKEN_GREATER]        = {NULL,              binaryArithmeticHandler,   PREC_COMPARISON},
+  [TOKEN_GREATER_EQUAL]  = {NULL,              binaryArithmeticHandler,   PREC_COMPARISON},
+  [TOKEN_LESS]           = {NULL,              binaryArithmeticHandler,   PREC_COMPARISON},
+  [TOKEN_LESS_EQUAL]     = {NULL,              binaryArithmeticHandler,   PREC_COMPARISON},
+  [TOKEN_PLUS_PLUS]      = {NULL,              postfixHandler,            PREC_INC_DCR},
+  [TOKEN_MINUS_MINUS]    = {NULL,              postfixHandler,            PREC_INC_DCR},
+  [TOKEN_AND]            = {NULL,              binaryArithmeticHandler,   PREC_AND},
+  [TOKEN_OR]             = {NULL,              binaryArithmeticHandler,   PREC_OR},
+  [TOKEN_IDENTIFIER]     = {literalHandler,    NULL,                      PREC_NONE},
+  [TOKEN_STRING_LITERAL] = {NULL,              NULL,                      PREC_NONE},
+  [TOKEN_CHAR_LITERAL]   = {NULL,              NULL,                      PREC_NONE},
+  [TOKEN_NUMBER]         = {literalHandler,    NULL,                      PREC_PRIMARY},
+  [TOKEN_ARRAY]          = {NULL,              NULL,                      PREC_NONE},
+  [TOKEN_BOOLEAN]        = {NULL,              NULL,                      PREC_NONE},
+  [TOKEN_CHAR]           = {NULL,              NULL,                      PREC_NONE},
+  [TOKEN_INTEGER]        = {NULL,              NULL,                      PREC_NONE},
+  [TOKEN_STRING]         = {NULL,              NULL,                      PREC_NONE},
+  [TOKEN_VOID]           = {NULL,              NULL,                      PREC_NONE},
+  [TOKEN_IF]             = {NULL,              NULL,                      PREC_NONE},
+  [TOKEN_ELSE]           = {NULL,              NULL,                      PREC_NONE},
+  [TOKEN_WHILE]          = {NULL,              NULL,                      PREC_NONE},
+  [TOKEN_FOR]            = {NULL,              NULL,                      PREC_NONE},
+  [TOKEN_TRUE]           = {literalHandler,    NULL,                      PREC_PRIMARY},
+  [TOKEN_FALSE]          = {literalHandler,    NULL,                      PREC_PRIMARY},
+  [TOKEN_FUNCTION]       = {NULL,              NULL,                      PREC_NONE},
+  [TOKEN_RETURN]         = {NULL,              NULL,                      PREC_NONE},
+  [TOKEN_PRINT]          = {NULL,              NULL,                      PREC_NONE},
+  [TOKEN_EOF]            = {NULL,              NULL,                      PREC_NONE},
+  [TOKEN_ERROR]          = {NULL,              NULL,                      PREC_NONE},
+  [TOKEN_COMMENT]        = {NULL,              NULL,                      PREC_NONE},
 };
 
 static ParseRule *getRule(TokenType type) {
@@ -233,6 +284,29 @@ static void freeBinaryExpr(BinaryExpr expr) {
   freeExpr(expr.expr2);
 }
 
+static void freeIdxExpr(IdxExpr expr) {
+  freeExpr(expr.arr);
+  freeExpr(expr.idx);
+}
+
+static void freeCallExpr(CallExpr expr) {
+  freeExpr(expr.func);
+  for (int i = 0; i < expr.paramCnt; i++) {
+    freeInsideExpr(expr.params + i);
+  }
+  free(expr.params);
+}
+
+static void freeInsideExpr(Expr *expr) {
+  switch(expr->type) {
+    case EXPR_LITERAL: freeLiteralExpr(PTR_AS_LITERAL(expr)); break;
+    case EXPR_UNARY: freeUnaryExpr(PTR_AS_UNARY(expr)); break;
+    case EXPR_BINARY: freeBinaryExpr(PTR_AS_BINARY(expr)); break;
+    case EXPR_IDX: freeIdxExpr(PTR_AS_IDX(expr)); break;
+    case EXPR_CALL: freeCallExpr(PTR_AS_CALL(expr)); break;
+  }
+}
+
 int parse(Expr *expr, const char* source) {
   initScanner(source);
   
@@ -250,13 +324,7 @@ int parse(Expr *expr, const char* source) {
 }
 
 void freeExpr(Expr *expr) {
-  switch(expr->type) {
-    case EXPR_LITERAL: freeLiteralExpr(PTR_AS_LITERAL(expr)); break;
-    case EXPR_UNARY: freeUnaryExpr(PTR_AS_UNARY(expr)); break;
-    case EXPR_BINARY: freeBinaryExpr(PTR_AS_BINARY(expr)); break;
-  }
-
+  freeInsideExpr(expr);
   free(expr);
 }
-
 

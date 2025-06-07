@@ -3,12 +3,16 @@
 
 #include "scanner.h"
 
+#define MAX_FUNC_PARAM 10
+
 typedef struct _expr Expr;
 
 typedef enum {
   EXPR_UNARY,
   EXPR_BINARY,
   EXPR_LITERAL,
+  EXPR_IDX,
+  EXPR_CALL,
 } ExprType;
 
 typedef struct {
@@ -26,12 +30,25 @@ typedef struct {
   Expr *expr2;
 } BinaryExpr;
 
+typedef struct {
+  Expr *arr;
+  Expr *idx;
+} IdxExpr;
+
+typedef struct {
+  int paramCnt;
+  Expr *func;
+  Expr *params;
+} CallExpr;
+
 struct _expr {
   ExprType type;
   union {
     UnaryExpr unaryExpr;
     BinaryExpr binaryExpr;
     LiteralExpr literalExpr;
+    IdxExpr idxExpr;
+    CallExpr callExpr;
   } as;
 };
 
@@ -68,17 +85,46 @@ struct _expr {
     }                                          \
   })
 
+#define IDX_EXPR(arrPtr, idxPtr)               \
+  ((Expr) {                                    \
+    .type = EXPR_IDX,                          \
+    .as = {                                    \
+      .idxExpr = {                             \
+        .arr = (arrPtr),                       \
+        .idx = (idxPtr)                        \
+      }                                        \
+    }                                          \
+  })
+
+#define CALL_EXPR(argCnt, funcPtr, paramsPtr)  \
+  ((Expr) {                                    \
+  .type = EXPR_CALL,                           \
+  .as = {                                      \
+    .callExpr = {                              \
+      .paramCnt = (argCnt),                    \
+      .func = (funcPtr),                       \
+      .params = (paramsPtr)                    \
+      }                                        \
+    }                                          \
+  })
+
 #define IS_LITERAL(expr) ((expr).type == EXPR_LITERAL)
 #define IS_UNARY(expr) ((expr).type == EXPR_UNARY)
 #define IS_BINARY(expr) ((expr).type == EXPR_BINARY)
+#define IS_IDX(expr) ((expr).type == EXPR_IDX)
+#define IS_CALL(expr) ((expr).type == EXPR_CALL)
 
 #define AS_LITERAL(expr) ((expr).as.literalExpr)
 #define AS_UNARY(expr) ((expr).as.unaryExpr)
 #define AS_BINARY(expr) ((expr).as.binaryExpr)
+#define AS_IDX(expr) ((expr).as.idxExpr)
+#define AS_CALL(expr) ((expr).as.callExpr)
 
 #define PTR_AS_LITERAL(expr) ((expr)->as.literalExpr)
 #define PTR_AS_UNARY(expr) ((expr)->as.unaryExpr)
 #define PTR_AS_BINARY(expr) ((expr)->as.binaryExpr)
+#define PTR_AS_IDX(expr) ((expr)->as.idxExpr)
+#define PTR_AS_CALL(expr) ((expr)->as.callExpr)
 
 int parse(Expr *expr, const char* source);
 void freeExpr(Expr *expr);
