@@ -162,7 +162,7 @@ static Token stringLiteral() {
   if (isAtEnd()) return errorToken("Unterminated string.");
 
   advance();
-  return makeToken(TOKEN_STRING);
+  return makeToken(TOKEN_STRING_LITERAL);
 }
 
 void initScanner(const char *source) {
