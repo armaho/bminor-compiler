@@ -355,9 +355,7 @@ static bool consumeSemicolon() {
   return consume(TOKEN_SEMICOLON, "Expected ';'");
 }
 
-static int addAssignmentStmt(Program *program) {
-  Token ident = parser.previous;
-
+static int addAssignmentStmt(Program *program, Token ident) {
   advance();
 
   Expr *expr = MALLOC_OR_DIE(Expr, 1);
@@ -368,15 +366,13 @@ static int addAssignmentStmt(Program *program) {
   return 0;
 }
 
-static int addIntDeclarationStmt(Program *program) {
+static int addIntDeclarationStmt(Program *program, Token ident) {
+  addProgram(program, INT_DECLARATION_STMT(ident));
+ 
   advance();
 
-  if (!consume(TOKEN_IDENTIFIER, "Invalid Identifier")) return -1;
-
-  addProgram(program, INT_DECLARATION_STMT(parser.previous));
-  
   if (match(TOKEN_EQUAL)) {
-    addAssignmentStmt(program);   
+    addAssignmentStmt(program, ident);   
     consumeSemicolon();
   } else if (match(TOKEN_SEMICOLON)) {
     advance();
@@ -388,9 +384,25 @@ static int addIntDeclarationStmt(Program *program) {
   return 0;
 }
 
+static int addDeclarationStmt(Program *program, Token ident) {
+  advance();
+
+  switch (parser.current.type) {
+    case TOKEN_INTEGER: return addIntDeclarationStmt(program, ident);
+    default: errorAtCurrent("Expected variable type."); return -1;
+  }
+}
+
 static int addStmt(Program *program) {
   switch (parser.current.type) {
-    case TOKEN_INTEGER: return addIntDeclarationStmt(program);
+    case TOKEN_IDENTIFIER: {
+      advance();
+
+      switch (parser.current.type) {
+        case TOKEN_COLON: return addDeclarationStmt(program, parser.previous);
+        default: return expression(NULL); // todo: complete with exprStmt
+      }
+    }
     case TOKEN_EOF: advance(); return 0;
     default: return -1; // unreachable
   }
