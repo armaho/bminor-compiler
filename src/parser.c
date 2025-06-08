@@ -88,6 +88,17 @@ static void advance() {
   }
 }
 
+static Token peek() {
+  Token t = peekToken();
+
+  while (t.type == TOKEN_ERROR || t.type == TOKEN_COMMENT) {
+    advance();
+    t = peekToken();
+  }
+
+  return t;
+}
+
 static bool consume(TokenType type, const char *message) {
   if (parser.current.type == type) {
     advance();
@@ -393,18 +404,28 @@ static int addDeclarationStmt(Program *program, Token ident) {
   }
 }
 
+static int addExprStmt(Program *program) {
+  Expr *expr = MALLOC_OR_DIE(Expr, 1);
+
+  if (expression(expr)) return -1;
+  if (!consumeSemicolon()) return -1;
+
+  addProgram(program, EXPR_STMT(expr));
+  return 0;
+}
+
 static int addStmt(Program *program) {
   switch (parser.current.type) {
     case TOKEN_IDENTIFIER: {
-      advance();
+      Token t = peek();
 
-      switch (parser.current.type) {
-        case TOKEN_COLON: return addDeclarationStmt(program, parser.previous);
-        default: return expression(NULL); // todo: complete with exprStmt
+      switch (t.type) {
+        case TOKEN_COLON: advance(); return addDeclarationStmt(program, parser.previous);
+        default: return addExprStmt(program);
       }
     }
     case TOKEN_EOF: advance(); return 0;
-    default: return -1; // unreachable
+    default: return addExprStmt(program);
   }
 }
 

@@ -230,3 +230,14 @@ Token scanToken() {
   return errorToken("Unexpected character.");
 }
 
+Token peekToken() {
+  const char *prevStart = scn.start;
+  const char *prevCurrent = scn.current;
+
+  Token t = scanToken();
+
+  scn.start = prevStart;
+  scn.current = prevCurrent;
+
+  return t;
+}
