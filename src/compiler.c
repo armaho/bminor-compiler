@@ -7,6 +7,7 @@
 #include "disassemble.h"
 
 static void compileExpr(Expr *expr);
+static void compileStmt(Stmt stmt);
 
 static void compileLiteralExpr(LiteralExpr expr) {
   Token t = expr.token;
@@ -115,6 +116,25 @@ static void compileAssignment(AssignmentStmt stmt) {
   printf(";");
 }
 
+static void compileBlock(BlockStmt stmt) {
+  printf("{");
+  for (int i = 0; i < stmt.len; i++) {
+    compileStmt(stmt.stmts[i]); 
+  }
+  printf("}");
+}
+
+void compileStmt(Stmt stmt) {
+  switch (stmt.type) {
+    case STMT_EXPR: compileExprStmt(AS_EXPR(stmt)); break;
+    case STMT_INT_DECLARATION: compileIntDeclaration(AS_INT_DECLARATION(stmt)); break;
+    case STMT_CHAR_DECLARATION: compileCharDeclaration(AS_CHAR_DECLARATION(stmt)); break;
+    case STMT_STR_DECLARATION: compileStrDeclaration(AS_STR_DECLARATION(stmt)); break;
+    case STMT_ASSIGNMENT: compileAssignment(AS_ASSIGNMENT(stmt)); break;
+    case STMT_BLOCK: compileBlock(AS_BLOCK(stmt)); break;
+  }
+}
+
 int compile(const char *source) {
   Program *program = MALLOC_OR_DIE(Program, 1);
 
@@ -124,14 +144,7 @@ int compile(const char *source) {
 
   for (int i = 0; i < program->len; i++) {
     Stmt s = program->stmts[i];
-
-    switch (s.type) {
-      case STMT_EXPR: compileExprStmt(AS_EXPR(s)); break;
-      case STMT_INT_DECLARATION: compileIntDeclaration(AS_INT_DECLARATION(s)); break;
-      case STMT_CHAR_DECLARATION: compileCharDeclaration(AS_CHAR_DECLARATION(s)); break;
-      case STMT_STR_DECLARATION: compileStrDeclaration(AS_STR_DECLARATION(s)); break;
-      case STMT_ASSIGNMENT: compileAssignment(AS_ASSIGNMENT(s)); break;
-    }
+    compileStmt(s);
   }
 
   printf("\n");

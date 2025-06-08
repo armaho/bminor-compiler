@@ -126,12 +126,15 @@ struct _expr {
 #define PTR_AS_IDX(expr) ((expr)->as.idxExpr)
 #define PTR_AS_CALL(expr) ((expr)->as.callExpr)
 
+typedef struct _stmt Stmt;
+
 typedef enum {
   STMT_EXPR,
   STMT_INT_DECLARATION,
   STMT_CHAR_DECLARATION,
   STMT_STR_DECLARATION,
   STMT_ASSIGNMENT,
+  STMT_BLOCK,
 } StmtType;
 
 typedef struct {
@@ -156,6 +159,12 @@ typedef struct {
 } AssignmentStmt;
 
 typedef struct {
+  int len;
+  int cap;
+  Stmt *stmts;
+} BlockStmt;
+
+struct _stmt {
   StmtType type;
   union {
     ExprStmt exprStmt;
@@ -163,8 +172,9 @@ typedef struct {
     CharDeclarationStmt charDeclarationStmt;
     StrDeclarationStmt strDeclarationStmt;
     AssignmentStmt assignmentStmt;
+    BlockStmt blockStmt;
   } as;
-} Stmt;
+};
 
 typedef struct {
   int len;
@@ -223,11 +233,20 @@ typedef struct {
      }, \
    })
 
+#define BLOCK_STMT(block) \
+  ((Stmt){ \
+    .type = STMT_BLOCK, \
+    .as = { \
+      .blockStmt = (block), \
+    }, \
+   })
+
 #define AS_INT_DECLARATION(stmt) ((stmt).as.intDeclarationStmt)
 #define AS_ASSIGNMENT(stmt) ((stmt).as.assignmentStmt)
 #define AS_EXPR(stmt) ((stmt).as.exprStmt)
 #define AS_CHAR_DECLARATION(stmt) ((stmt).as.charDeclarationStmt)
 #define AS_STR_DECLARATION(stmt) ((stmt).as.strDeclarationStmt)
+#define AS_BLOCK(stmt) ((stmt).as.blockStmt)
 
 #define PTR_AS_INT_DECLARATION(stmt) ((stmt)->as.intDeclarationStmt)
 #define PTR_AS_ASSIGNMENT(stmt) ((stmt)->as.assignmentStmt)

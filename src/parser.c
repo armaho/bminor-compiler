@@ -9,6 +9,7 @@
 #include "disassemble.h"
 
 #define INIT_PROGRAM_SIZE 8
+#define INIT_BLOCK_SIZE 8
 
 typedef struct {
   Token current;
@@ -47,6 +48,7 @@ static ParseRule *getRule(TokenType type);
 static int parsePrecedence(Expr *expr, Precedence precedence);
 static void freeInsideExpr(Expr *expr);
 static void freeExpr(Expr *expr);
+static int addStmt(Program *program);
 
 static void errorAt(Token *token, const char *message) {
   fprintf(stderr, "[line %d] Error", token->line);
@@ -452,6 +454,25 @@ static int addExprStmt(Program *program) {
   return 0;
 }
 
+static int addBlockStmt(Program *program) {
+  BlockStmt block;
+  Program *blockProgram = (Program *)&block;
+
+  initProgram(blockProgram);
+  
+  advance();
+
+  while (parser.current.type != TOKEN_RIGHT_BRACE && parser.current.type != TOKEN_EOF) {
+    if (addStmt(blockProgram)) return -1;
+  }
+
+  if (!consume(TOKEN_RIGHT_BRACE, "Expected '}' at the end of block")) return -1;
+
+  addProgram(program, BLOCK_STMT(block));
+
+  return 0;
+}
+
 static int addStmt(Program *program) {
   switch (parser.current.type) {
     case TOKEN_IDENTIFIER: {
@@ -463,7 +484,8 @@ static int addStmt(Program *program) {
       }
     }
     case TOKEN_EOF: advance(); return 0;
-    default: return addExprStmt(program);
+    case TOKEN_LEFT_BRACE: return addBlockStmt(program);
+    default: errorAtCurrent("Unexpected token"); return -1;
   }
 }
 
@@ -478,5 +500,4 @@ int parse(Program *program, const char *source) {
 
     return 0;
 }
-
 
