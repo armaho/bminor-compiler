@@ -434,7 +434,7 @@ static int addStrDeclarationStmt(Program *program, Token ident) {
 }
 static int addDeclarationStmt(Program *program, Token ident) {
   advance();
-
+  
   switch (parser.current.type) {
     case TOKEN_INTEGER: return addIntDeclarationStmt(program, ident);
     case TOKEN_CHAR: return addCharDeclarationStmt(program, ident);
@@ -454,13 +454,10 @@ static int addExprStmt(Program *program) {
   return 0;
 }
 
-static int addBlockStmt(Program *program) {
-  BlockStmt block;
-  Program *blockProgram = (Program *)&block;
+static int readBlockStmt(BlockStmt *block) {
+  Program *blockProgram = (Program *)block;
 
   initProgram(blockProgram);
-  
-  advance();
 
   while (parser.current.type != TOKEN_RIGHT_BRACE && parser.current.type != TOKEN_EOF) {
     if (addStmt(blockProgram)) return -1;
@@ -468,8 +465,55 @@ static int addBlockStmt(Program *program) {
 
   if (!consume(TOKEN_RIGHT_BRACE, "Expected '}' at the end of block")) return -1;
 
+  return 0;
+}
+
+static int addBlockStmt(Program *program) {
+  BlockStmt block;
+
+  if (readBlockStmt(&block)) return -1;
   addProgram(program, BLOCK_STMT(block));
 
+  return 0;
+}
+
+static int readIfStmt(IfStmt *stmt) {
+  if (!consume(TOKEN_IF, "Expected 'if'")) return -1;
+  if (!consume(TOKEN_LEFT_PAREN, "Expected '(' after if")) return -1;
+
+  stmt->condition = MALLOC_OR_DIE(Expr, 1);
+  if (expression(stmt->condition)) return -1;
+  
+  if (!consume(TOKEN_RIGHT_PAREN, "Expected ')' after if condition")) return -1;
+  if (!consume(TOKEN_LEFT_BRACE, "Expected then block for if")) return -1;
+  if (readBlockStmt(&stmt->then)) return -1;
+
+  if (!match(TOKEN_ELSE)) {
+    initProgram((Program *)&(stmt->elze.elze));
+    stmt->hasElseIf = 0;
+  } else {
+    advance();
+
+    if (match(TOKEN_IF)) {
+      stmt->hasElseIf = 1;
+      stmt->elze.elzeif = MALLOC_OR_DIE(IfStmt, 1);
+      if (readIfStmt(stmt->elze.elzeif)) return -1;
+    } else if (consume(TOKEN_LEFT_BRACE, "Expected '{' after else")) {
+      stmt->hasElseIf = 0;
+      if (readBlockStmt(&(stmt->elze.elze))) return -1;
+    } else {
+      return -1;
+    }
+  }
+
+  return 0;
+}
+
+static int addIfStmt(Program *program) {
+  IfStmt ifStmt;
+  if (readIfStmt(&ifStmt)) return -1;
+
+  addProgram(program, IF_STMT(ifStmt));
   return 0;
 }
 
@@ -484,7 +528,8 @@ static int addStmt(Program *program) {
       }
     }
     case TOKEN_EOF: advance(); return 0;
-    case TOKEN_LEFT_BRACE: return addBlockStmt(program);
+    case TOKEN_LEFT_BRACE: advance(); return addBlockStmt(program);
+    case TOKEN_IF: return addIfStmt(program);
     default: errorAtCurrent("Unexpected token"); return -1;
   }
 }

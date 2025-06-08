@@ -127,6 +127,7 @@ struct _expr {
 #define PTR_AS_CALL(expr) ((expr)->as.callExpr)
 
 typedef struct _stmt Stmt;
+typedef struct _if_stmt IfStmt;
 
 typedef enum {
   STMT_EXPR,
@@ -135,6 +136,7 @@ typedef enum {
   STMT_STR_DECLARATION,
   STMT_ASSIGNMENT,
   STMT_BLOCK,
+  STMT_IF,
 } StmtType;
 
 typedef struct {
@@ -164,6 +166,16 @@ typedef struct {
   Stmt *stmts;
 } BlockStmt;
 
+struct _if_stmt {
+  Expr *condition;
+  BlockStmt then;
+  int hasElseIf;
+  union {
+    struct _if_stmt *elzeif;
+    BlockStmt elze;
+  } elze;
+};
+
 struct _stmt {
   StmtType type;
   union {
@@ -173,6 +185,7 @@ struct _stmt {
     StrDeclarationStmt strDeclarationStmt;
     AssignmentStmt assignmentStmt;
     BlockStmt blockStmt;
+    IfStmt ifStmt;
   } as;
 };
 
@@ -241,12 +254,21 @@ typedef struct {
     }, \
    })
 
+#define IF_STMT(ifStmtArg) \
+  ((Stmt) { \
+    .type = STMT_IF, \
+    .as = { \
+      .ifStmt = (ifStmtArg) \
+    }, \
+   })
+
 #define AS_INT_DECLARATION(stmt) ((stmt).as.intDeclarationStmt)
 #define AS_ASSIGNMENT(stmt) ((stmt).as.assignmentStmt)
 #define AS_EXPR(stmt) ((stmt).as.exprStmt)
 #define AS_CHAR_DECLARATION(stmt) ((stmt).as.charDeclarationStmt)
 #define AS_STR_DECLARATION(stmt) ((stmt).as.strDeclarationStmt)
 #define AS_BLOCK(stmt) ((stmt).as.blockStmt)
+#define AS_IF(stmt) ((stmt).as.ifStmt)
 
 #define PTR_AS_INT_DECLARATION(stmt) ((stmt)->as.intDeclarationStmt)
 #define PTR_AS_ASSIGNMENT(stmt) ((stmt)->as.assignmentStmt)

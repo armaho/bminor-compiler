@@ -124,6 +124,21 @@ static void compileBlock(BlockStmt stmt) {
   printf("}");
 }
 
+static void compileIf(IfStmt stmt) {
+  printf("if");
+  compileExpr(stmt.condition);
+  compileBlock(stmt.then);
+  
+  printf("else");
+
+  if (stmt.hasElseIf) {
+    printf(" ");
+    compileIf(*stmt.elze.elzeif);
+  } else {
+    compileBlock(stmt.elze.elze);
+  }
+}
+
 void compileStmt(Stmt stmt) {
   switch (stmt.type) {
     case STMT_EXPR: compileExprStmt(AS_EXPR(stmt)); break;
@@ -132,6 +147,7 @@ void compileStmt(Stmt stmt) {
     case STMT_STR_DECLARATION: compileStrDeclaration(AS_STR_DECLARATION(stmt)); break;
     case STMT_ASSIGNMENT: compileAssignment(AS_ASSIGNMENT(stmt)); break;
     case STMT_BLOCK: compileBlock(AS_BLOCK(stmt)); break;
+    case STMT_IF: compileIf(AS_IF(stmt)); break;
   }
 }
 
