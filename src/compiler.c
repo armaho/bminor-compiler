@@ -20,7 +20,6 @@ int compile(const char *source) {
   Program *program = MALLOC_OR_DIE(Program, 1);
 
   if (parse(program, source)) {
-    printf("err\n");
     return -1;
   }
 
