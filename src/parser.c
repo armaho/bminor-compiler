@@ -395,11 +395,49 @@ static int addIntDeclarationStmt(Program *program, Token ident) {
   return 0;
 }
 
+static int addCharDeclarationStmt(Program *program, Token ident) {
+  addProgram(program, CHAR_DECLARATION_STMT(ident));
+ 
+  advance();
+
+  if (match(TOKEN_EQUAL)) {
+    addAssignmentStmt(program, ident);   
+    consumeSemicolon();
+  } else if (match(TOKEN_SEMICOLON)) {
+    advance();
+  } else {
+    errorAtCurrent("Expected ';'");
+    return -1;
+  }
+
+  return 0;
+}
+
+static int addStrDeclarationStmt(Program *program, Token ident) {
+  addProgram(program, STR_DECLARATION_STMT(ident));
+ 
+  advance();
+
+  if (match(TOKEN_EQUAL)) {
+    addAssignmentStmt(program, ident);   
+    consumeSemicolon();
+  } else if (match(TOKEN_SEMICOLON)) {
+    advance();
+  } else {
+    errorAtCurrent("Expected ';'");
+    return -1;
+  }
+
+  return 0;
+}
 static int addDeclarationStmt(Program *program, Token ident) {
   advance();
 
   switch (parser.current.type) {
     case TOKEN_INTEGER: return addIntDeclarationStmt(program, ident);
+    case TOKEN_CHAR: return addCharDeclarationStmt(program, ident);
+    case TOKEN_BOOLEAN: return addIntDeclarationStmt(program, ident);
+    case TOKEN_STRING: return addStrDeclarationStmt(program, ident);
     default: errorAtCurrent("Expected variable type."); return -1;
   }
 }

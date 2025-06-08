@@ -53,5 +53,6 @@ typedef struct {
 void initScanner(const char *source);
 Token scanToken();
 Token peekToken();
+Token makeCustomToken(const char *text, TokenType type, int line);
 
 #endif

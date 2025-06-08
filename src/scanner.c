@@ -241,3 +241,12 @@ Token peekToken() {
 
   return t;
 }
+
+Token makeCustomToken(const char *text, TokenType type, int line) {
+  return (Token){
+    .start = text,
+    .type = type,
+    .length = strlen(text),
+    .line = line,
+  };
+}

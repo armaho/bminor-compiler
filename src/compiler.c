@@ -101,9 +101,17 @@ static void compileIntDeclaration(IntDeclarationStmt stmt) {
   printf("int %.*s; ", stmt.ident.length, stmt.ident.start);
 }
 
+static void compileCharDeclaration(CharDeclarationStmt stmt) {
+  printf("char %.*s; ", stmt.ident.length, stmt.ident.start);
+}
+
+static void compileStrDeclaration(StrDeclarationStmt stmt) {
+  printf("char *%.*s; ", stmt.ident.length, stmt.ident.start);
+}
+
 static void compileAssignment(AssignmentStmt stmt) {
   printf("%.*s = ", stmt.ident.length, stmt.ident.start);
-  disassembleExpr(stmt.expr);
+  compileExpr(stmt.expr);
   printf(";");
 }
 
@@ -120,6 +128,8 @@ int compile(const char *source) {
     switch (s.type) {
       case STMT_EXPR: compileExprStmt(AS_EXPR(s)); break;
       case STMT_INT_DECLARATION: compileIntDeclaration(AS_INT_DECLARATION(s)); break;
+      case STMT_CHAR_DECLARATION: compileCharDeclaration(AS_CHAR_DECLARATION(s)); break;
+      case STMT_STR_DECLARATION: compileStrDeclaration(AS_STR_DECLARATION(s)); break;
       case STMT_ASSIGNMENT: compileAssignment(AS_ASSIGNMENT(s)); break;
     }
   }
