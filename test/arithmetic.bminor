@@ -1,0 +1,22 @@
+/* Arithmetic operations */
+sum: int = x + y; // Addition
+difference: int = x - y; // Subtraction
+product: int = x * y; // Multiplication
+quotient: int = x / y; // Division
+modulus: int = x % y; // Modulus
+
+/* Comparison operations */
+greater: bool = x > y; // Greater than
+smaller: bool = x < y; // Less than
+greaterEqual: bool = x >= y; // Greater than or equal to
+smallerEqual: bool = x <= y; // Less than or equal to
+equal: bool = x == y; // Equal to
+notEqual: bool = x != y; // Not equal to
+
+/* Logical operations */
+logicalAnd: bool = z && (x > y); // Logical AND
+logicalOr: bool = z || (x < y); // Logical OR
+logicalNot: bool = !z; // Logical negation
+
+// Invalid operator
+invalidOperator: int = x & y;

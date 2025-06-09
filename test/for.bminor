@@ -1,0 +1,15 @@
+fib: func int (a: int) {
+  if (a == 0 || a == 1) {
+    return 1;
+  }
+
+  return fib(a - 1) + fib(a - 2);
+}
+
+main: func void () {
+  i: int;
+  
+  for (i = 0; i < 10; i++) {
+    print "%d\n", fib(i);
+  }
+}

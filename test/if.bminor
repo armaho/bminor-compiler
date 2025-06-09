@@ -1,0 +1,14 @@
+// Test Case 5: If-ElseIf-Else
+grade: int = 85;
+
+main: func void () {
+    if (grade >= 90) {
+        print "Grade: A\n";
+    } else if (grade >= 80) {
+        print "Grade: B\n";
+    } else if (grade >= 70) {
+        print "Grade: C\n";
+    } else {
+        print "Grade: D or F\n";
+    }
+}
