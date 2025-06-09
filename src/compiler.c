@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <string.h>
 
 #include "compiler.h"
 #include "parser.h"
@@ -23,8 +24,8 @@ static void compileUnaryExpr(UnaryExpr expr) {
   switch (expr.token.type) {
     case TOKEN_BANG: printf("!"); compileExpr(expr.expr); break;
     case TOKEN_MINUS: printf("-"); compileExpr(expr.expr); break;
-    case TOKEN_PLUS_PLUS: compileExpr(expr.expr); printf("--"); break;
-    case TOKEN_MINUS_MINUS: compileExpr(expr.expr); printf("++"); break;
+    case TOKEN_MINUS_MINUS: compileExpr(expr.expr); printf("--"); break;
+    case TOKEN_PLUS_PLUS: compileExpr(expr.expr); printf("++"); break;
     default: return; // unreachable
   }
 }
@@ -76,21 +77,17 @@ static void compileCallExpr(CallExpr expr) {
       printf(",");
     }
   }
-  printf("]");
+  printf(")");
 }
 
 static void compileExpr(Expr *expr) {
-  printf("(");
-
   switch (expr->type) {
     case EXPR_LITERAL: compileLiteralExpr(PTR_AS_LITERAL(expr)); break;
-    case EXPR_UNARY: compileUnaryExpr(PTR_AS_UNARY(expr)); break;
-    case EXPR_BINARY: compileBinaryExpr(PTR_AS_BINARY(expr)); break;
+    case EXPR_UNARY: printf("("); compileUnaryExpr(PTR_AS_UNARY(expr)); printf(")"); break;
+    case EXPR_BINARY: printf("("); compileBinaryExpr(PTR_AS_BINARY(expr)); printf(")");  break;
     case EXPR_IDX: compileIdxExpr(PTR_AS_IDX(expr)); break;
     case EXPR_CALL: compileCallExpr(PTR_AS_CALL(expr)); break;
   }
-
-  printf(")");
 }
 
 static void compileExprStmt(ExprStmt stmt) {
@@ -145,6 +142,67 @@ static void compileWhile(WhileStmt stmt) {
   compileBlock(stmt.block);
 }
 
+static void compilePrint(PrintStmt stmt) {
+  printf("printf(");
+  for (int i = 0; i < stmt.cnt; i++) {
+    compileExpr(stmt.args + i);
+
+    if (i != stmt.cnt - 1) {
+      printf(",");
+    }
+  }
+  printf(");");
+}
+
+static void compileFunc(FuncStmt stmt) {
+  switch (stmt.returnType.type) {
+    case TOKEN_INTEGER:
+    case TOKEN_CHAR:
+      printf("%.*s ", stmt.returnType.length, stmt.returnType.start); break;
+    case TOKEN_VOID:
+      if (strncmp(stmt.ident.start, "main", 4) == 0) {
+        printf("int ");
+      } else {
+        printf("void ");
+      }
+      break;
+    case TOKEN_BOOLEAN: printf("int "); break;
+    case TOKEN_STRING: printf("char *"); break;
+    default: break; // unreachable
+  }
+
+  printf("%.*s(", stmt.ident.length, stmt.ident.start);
+
+  for (int i = 0; i < stmt.cnt; i++) {
+    FuncArg arg = stmt.args[i];
+
+    switch (arg.type.type) {
+      case TOKEN_INTEGER:
+      case TOKEN_CHAR:
+        printf("%.*s ", arg.type.length, arg.type.start); break;
+      case TOKEN_BOOLEAN: printf("int "); break;
+      case TOKEN_STRING: printf("char *"); break;
+      default: break; // unreachable
+    }
+
+    printf("%.*s", arg.ident.length, arg.ident.start);
+
+    if (i != stmt.cnt - 1) {
+      printf(",");
+    }
+  }
+
+  printf(")");
+
+  compileBlock(stmt.body);
+}
+
+static void compileReturn(ReturnStmt stmt) {
+  printf("return ");
+  compileExpr(stmt.expr);
+  printf(";");
+}
+
 void compileStmt(Stmt stmt) {
   switch (stmt.type) {
     case STMT_EXPR: compileExprStmt(AS_EXPR(stmt)); break;
@@ -155,6 +213,9 @@ void compileStmt(Stmt stmt) {
     case STMT_BLOCK: compileBlock(AS_BLOCK(stmt)); break;
     case STMT_IF: compileIf(AS_IF(stmt)); break;
     case STMT_WHILE: compileWhile(AS_WHILE(stmt)); break;
+    case STMT_PRINT: compilePrint(AS_PRINT(stmt)); break;
+    case STMT_FUNC: compileFunc(AS_FUNC(stmt)); break;
+    case STMT_RETURN: compileReturn(AS_RETURN(stmt)); break;
   }
 }
 
@@ -165,6 +226,7 @@ int compile(const char *source) {
     return -1;
   }
 
+  printf("#include <stdio.h>\n");
   for (int i = 0; i < program->len; i++) {
     Stmt s = program->stmts[i];
     compileStmt(s);

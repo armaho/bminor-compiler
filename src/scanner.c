@@ -227,6 +227,8 @@ Token scanToken() {
       return charLiteral();
   }
 
+  printf("bluh '%u'\n", c);
+
   return errorToken("Unexpected character.");
 }
 

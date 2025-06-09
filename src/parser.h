@@ -138,6 +138,9 @@ typedef enum {
   STMT_BLOCK,
   STMT_IF,
   STMT_WHILE,
+  STMT_PRINT,
+  STMT_FUNC,
+  STMT_RETURN,
 } StmtType;
 
 typedef struct {
@@ -155,6 +158,11 @@ typedef struct {
 typedef struct {
   Token ident;
 } StrDeclarationStmt;
+
+typedef struct {
+  Token ident;
+  Token type;
+} FuncArg;
 
 typedef struct {
   Token ident;
@@ -182,6 +190,23 @@ typedef struct {
   BlockStmt block;
 } WhileStmt;
 
+typedef struct {
+  int cnt;
+  Expr *args;
+} PrintStmt;
+
+typedef struct {
+  Token ident;
+  Token returnType;
+  int cnt;
+  FuncArg *args;
+  BlockStmt body;
+} FuncStmt;
+
+typedef struct {
+  Expr *expr;
+} ReturnStmt;
+
 struct _stmt {
   StmtType type;
   union {
@@ -193,6 +218,9 @@ struct _stmt {
     BlockStmt blockStmt;
     IfStmt ifStmt;
     WhileStmt whileStmt;
+    PrintStmt printStmt;
+    FuncStmt funcStmt;
+    ReturnStmt returnStmt;
   } as;
 };
 
@@ -280,6 +308,41 @@ typedef struct {
     }, \
   })
 
+#define PRINT_STMT(argsCnt, argsPtr) \
+  ((Stmt) { \
+    .type = STMT_PRINT, \
+    .as = { \
+      .printStmt = { \
+        .cnt = argsCnt, \
+        .args = argsPtr, \
+      }, \
+    }, \
+  })
+
+#define FUNC_STMT(identToken, returnTypeToken, argsCnt, argsPtr, bodyStmt) \
+  ((Stmt) { \
+    .type = STMT_FUNC, \
+    .as = { \
+      .funcStmt = { \
+        .ident = (identToken), \
+        .returnType = (returnTypeToken), \
+        .cnt = (argsCnt), \
+        .args = (argsPtr), \
+        .body = (bodyStmt), \
+      }, \
+    }, \
+  })
+
+#define RETURN_STMT(exprPtr) \
+  ((Stmt){ \
+    .type = STMT_RETURN, \
+    .as = { \
+      .returnStmt = { \
+        .expr = (exprPtr) \
+      } \
+    } \
+  })
+
 #define AS_INT_DECLARATION(stmt) ((stmt).as.intDeclarationStmt)
 #define AS_ASSIGNMENT(stmt) ((stmt).as.assignmentStmt)
 #define AS_EXPR(stmt) ((stmt).as.exprStmt)
@@ -288,6 +351,9 @@ typedef struct {
 #define AS_BLOCK(stmt) ((stmt).as.blockStmt)
 #define AS_IF(stmt) ((stmt).as.ifStmt)
 #define AS_WHILE(stmt) ((stmt).as.whileStmt)
+#define AS_PRINT(stmt) ((stmt).as.printStmt)
+#define AS_FUNC(stmt) ((stmt).as.funcStmt)
+#define AS_RETURN(stmt) ((stmt).as.returnStmt)
 
 #define PTR_AS_INT_DECLARATION(stmt) ((stmt)->as.intDeclarationStmt)
 #define PTR_AS_ASSIGNMENT(stmt) ((stmt)->as.assignmentStmt)

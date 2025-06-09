@@ -49,6 +49,7 @@ static int parsePrecedence(Expr *expr, Precedence precedence);
 static void freeInsideExpr(Expr *expr);
 static void freeExpr(Expr *expr);
 static int addStmt(Program *program);
+static int readBlockStmt(BlockStmt *block);
 
 static void errorAt(Token *token, const char *message) {
   fprintf(stderr, "[line %d] Error", token->line);
@@ -432,6 +433,62 @@ static int addStrDeclarationStmt(Program *program, Token ident) {
 
   return 0;
 }
+
+static int addFuncStmt(Program *program, Token ident) {
+  advance();
+
+  Token returnType;
+  if (TOKEN_BOOLEAN <= parser.current.type && parser.current.type <= TOKEN_VOID) {
+    returnType = parser.current;
+  } else {
+    errorAtCurrent("Expected atomic type for return type of function.");
+    return -1;
+  }
+  advance();
+
+  if (!consume(TOKEN_LEFT_PAREN, "Expected '('")) return -1;
+
+  FuncArg *args = MALLOC_OR_DIE(FuncArg, MAX_FUNC_PARAM);
+  int argsCnt = 0;
+
+  while (parser.current.type != TOKEN_RIGHT_PAREN && parser.current.type != TOKEN_EOF) {
+    if (argsCnt == MAX_FUNC_PARAM) {
+      errorAtCurrent("To many arguments.");
+      return -1;
+    }
+
+    if (!match(TOKEN_IDENTIFIER)) {
+      errorAtCurrent("Expected identifier.");
+      return -1;
+    }
+    args[argsCnt].ident = parser.current;
+    advance();
+
+    if (!consume(TOKEN_COLON, "Expected ':'.")) return -1;
+    
+    if (parser.current.type < TOKEN_BOOLEAN || TOKEN_STRING < parser.current.type) {
+      errorAtCurrent("Expected type.");
+      return -1;
+    }
+    args[argsCnt].type = parser.current;
+    advance();
+
+    if (!match(TOKEN_RIGHT_PAREN) &&
+        !consume(TOKEN_COMMA, "Expected ','.")) return -1;
+    argsCnt++;
+  }
+  
+  if (!consume(TOKEN_RIGHT_PAREN, "Expected ')'.")) return -1;
+  if (!consume(TOKEN_LEFT_BRACE, "Expected '{'.")) return -1;
+
+  BlockStmt block;
+  if (readBlockStmt(&block)) return -1;
+
+  addProgram(program, FUNC_STMT(ident, returnType, argsCnt, args, block)); 
+
+  return 0;
+}
+
 static int addDeclarationStmt(Program *program, Token ident) {
   advance();
   
@@ -440,6 +497,7 @@ static int addDeclarationStmt(Program *program, Token ident) {
     case TOKEN_CHAR: return addCharDeclarationStmt(program, ident);
     case TOKEN_BOOLEAN: return addIntDeclarationStmt(program, ident);
     case TOKEN_STRING: return addStrDeclarationStmt(program, ident);
+    case TOKEN_FUNCTION: return addFuncStmt(program, ident);
     default: errorAtCurrent("Expected variable type."); return -1;
   }
 }
@@ -564,6 +622,40 @@ static int addForStmt(Program *program) {
   return 0;
 }
 
+static int addPrintStmt(Program *program) {
+  Expr *args = MALLOC_OR_DIE(Expr, MAX_FUNC_PARAM);
+  int argsCnt = 0; 
+
+  while (parser.current.type != TOKEN_SEMICOLON && parser.current.type != TOKEN_EOF) {
+    if (argsCnt == MAX_FUNC_PARAM) {
+      errorAtCurrent("Too much arguments.");
+      return -1;
+    }
+
+    if (expression(args + argsCnt)) return -1;
+    argsCnt++;
+    
+    if (!match(TOKEN_SEMICOLON) && 
+        !consume(TOKEN_COMMA, "Expected ',' or ';' after expression")) return -1;
+  }
+
+  if (!consumeSemicolon()) return -1;
+
+  addProgram(program, PRINT_STMT(argsCnt, args));
+
+  return 0;
+}
+
+static int addReturnStmt(Program *program) {
+  Expr *expr = MALLOC_OR_DIE(Expr, 1);
+  if (expression(expr)) return -1;
+  if (!consumeSemicolon()) return -1;
+
+  addProgram(program, RETURN_STMT(expr));
+
+  return 0;
+}
+
 static int addStmt(Program *program) {
   switch (parser.current.type) {
     case TOKEN_IDENTIFIER: {
@@ -579,6 +671,8 @@ static int addStmt(Program *program) {
     case TOKEN_IF: return addIfStmt(program);
     case TOKEN_WHILE: advance(); return addWhileStmt(program);
     case TOKEN_FOR: advance(); return addForStmt(program);
+    case TOKEN_PRINT: advance(); return addPrintStmt(program);
+    case TOKEN_RETURN: advance(); return addReturnStmt(program);
     default: errorAtCurrent("Unexpected token"); return -1;
   }
 }
