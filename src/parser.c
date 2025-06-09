@@ -517,6 +517,53 @@ static int addIfStmt(Program *program) {
   return 0;
 }
 
+static int addWhileStmt(Program *program) {
+  if (!consume(TOKEN_LEFT_PAREN, "Expected '(' before while condition.")) return -1;
+
+  Expr *cond = MALLOC_OR_DIE(Expr, 1);
+  if (expression(cond)) return -1;
+  if (!consume(TOKEN_RIGHT_PAREN, "Expected ')' after while condition.")) return -1;
+
+  if (!consume(TOKEN_LEFT_BRACE, "Expected '{' for while block")) return -1;
+  BlockStmt block;
+  if (readBlockStmt(&block)) return -1;
+
+  addProgram(program, WHILE_STMT(cond, block));
+
+  return 0;
+}
+
+static int addForStmt(Program *program) {
+  if (!consume(TOKEN_LEFT_PAREN, "Expected '(' after for.")) return -1;
+
+  BlockStmt block;
+  Program *programBlock = (Program *)&block;
+  initProgram(programBlock);
+
+  if (addExprStmt(programBlock)) return -1;
+
+  Expr *cond = MALLOC_OR_DIE(Expr, 1);
+  if (expression(cond)) return -1;
+
+  if (!consumeSemicolon()) return -1;
+
+  Expr *update = MALLOC_OR_DIE(Expr, 1);
+  if (expression(update)) return -1;
+
+  if (!consume(TOKEN_RIGHT_PAREN, "Expected ')' after for")) return -1;
+  if (!consume(TOKEN_LEFT_BRACE, "Expected '{' at the beginning of for block")) return -1;
+
+  BlockStmt forBlock;
+  if (readBlockStmt(&forBlock)) return -1;
+  addProgram((Program *)&forBlock, EXPR_STMT(update));
+
+  addProgram(programBlock, WHILE_STMT(cond, forBlock));
+
+  addProgram(program, BLOCK_STMT(block));
+
+  return 0;
+}
+
 static int addStmt(Program *program) {
   switch (parser.current.type) {
     case TOKEN_IDENTIFIER: {
@@ -530,6 +577,8 @@ static int addStmt(Program *program) {
     case TOKEN_EOF: advance(); return 0;
     case TOKEN_LEFT_BRACE: advance(); return addBlockStmt(program);
     case TOKEN_IF: return addIfStmt(program);
+    case TOKEN_WHILE: advance(); return addWhileStmt(program);
+    case TOKEN_FOR: advance(); return addForStmt(program);
     default: errorAtCurrent("Unexpected token"); return -1;
   }
 }

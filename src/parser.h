@@ -137,6 +137,7 @@ typedef enum {
   STMT_ASSIGNMENT,
   STMT_BLOCK,
   STMT_IF,
+  STMT_WHILE,
 } StmtType;
 
 typedef struct {
@@ -176,6 +177,11 @@ struct _if_stmt {
   } elze;
 };
 
+typedef struct {
+  Expr *cond;
+  BlockStmt block;
+} WhileStmt;
+
 struct _stmt {
   StmtType type;
   union {
@@ -186,6 +192,7 @@ struct _stmt {
     AssignmentStmt assignmentStmt;
     BlockStmt blockStmt;
     IfStmt ifStmt;
+    WhileStmt whileStmt;
   } as;
 };
 
@@ -262,6 +269,17 @@ typedef struct {
     }, \
    })
 
+#define WHILE_STMT(condPtr, blockStmt) \
+  ((Stmt) { \
+    .type = STMT_WHILE, \
+    .as = { \
+      .whileStmt = { \
+        .cond = condPtr, \
+        .block = blockStmt, \
+      }, \
+    }, \
+  })
+
 #define AS_INT_DECLARATION(stmt) ((stmt).as.intDeclarationStmt)
 #define AS_ASSIGNMENT(stmt) ((stmt).as.assignmentStmt)
 #define AS_EXPR(stmt) ((stmt).as.exprStmt)
@@ -269,6 +287,7 @@ typedef struct {
 #define AS_STR_DECLARATION(stmt) ((stmt).as.strDeclarationStmt)
 #define AS_BLOCK(stmt) ((stmt).as.blockStmt)
 #define AS_IF(stmt) ((stmt).as.ifStmt)
+#define AS_WHILE(stmt) ((stmt).as.whileStmt)
 
 #define PTR_AS_INT_DECLARATION(stmt) ((stmt)->as.intDeclarationStmt)
 #define PTR_AS_ASSIGNMENT(stmt) ((stmt)->as.assignmentStmt)

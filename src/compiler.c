@@ -139,6 +139,12 @@ static void compileIf(IfStmt stmt) {
   }
 }
 
+static void compileWhile(WhileStmt stmt) {
+  printf("while");
+  compileExpr(stmt.cond);
+  compileBlock(stmt.block);
+}
+
 void compileStmt(Stmt stmt) {
   switch (stmt.type) {
     case STMT_EXPR: compileExprStmt(AS_EXPR(stmt)); break;
@@ -148,6 +154,7 @@ void compileStmt(Stmt stmt) {
     case STMT_ASSIGNMENT: compileAssignment(AS_ASSIGNMENT(stmt)); break;
     case STMT_BLOCK: compileBlock(AS_BLOCK(stmt)); break;
     case STMT_IF: compileIf(AS_IF(stmt)); break;
+    case STMT_WHILE: compileWhile(AS_WHILE(stmt)); break;
   }
 }
 
