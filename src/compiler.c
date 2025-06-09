@@ -122,8 +122,9 @@ static void compileBlock(BlockStmt stmt) {
 }
 
 static void compileIf(IfStmt stmt) {
-  printf("if");
+  printf("if (");
   compileExpr(stmt.condition);
+  printf(")");
   compileBlock(stmt.then);
   
   printf("else");
